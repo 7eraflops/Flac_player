@@ -6,8 +6,10 @@
 #include <iostream>
 #include <stdexcept>
 #include <string>
+#include <unordered_map>
 
 #include "Bit_reader.hpp"
+#include "Utf8_decoder.hpp"
 
 class Flac
 {
@@ -48,6 +50,7 @@ public:
     void check_flac_marker();
     void read_metadata();
     void read_metadata_block_STREAMINFO();
+    void read_frame_header();
 };
 
 Flac::~Flac()
@@ -154,5 +157,74 @@ void Flac::read_metadata_block_STREAMINFO()
     for (size_t i = 0; i < 16; i++)
     {
         m_stream_info.md5_signature[i] = m_reader.read_bits(8);
+    }
+}
+
+void Flac::read_frame_header()
+{
+    if (m_reader.read_bits(14) != 0b11111111111110)
+    {
+        throw std::runtime_error("Invalid sync code in frame header");
+    }
+    if (m_reader.read_bits(1))
+    {
+        throw std::runtime_error("1st reserved bit in frame isn't 0");
+    }
+
+    uint8_t blocking_strategy = m_reader.read_bits(1);
+    uint8_t block_size_code = m_reader.read_bits(4);
+    if (block_size_code == 0b0000)
+    {
+        throw std::runtime_error("block size code has reserved value (0000)");
+    }
+    uint8_t sample_rate_code = m_reader.read_bits(4);
+    if (sample_rate_code == 0b1111)
+    {
+        throw std::runtime_error("sample rate code has reserved value (1111)");
+    }
+    uint8_t channel_assignment_code = m_reader.read_bits(4);
+    if (channel_assignment_code > 0b1010)
+    {
+        throw std::runtime_error("channel assignment code has reserved value (1011-1111)");
+    }
+    uint8_t sample_size_code = m_reader.read_bits(3);
+    if (sample_size_code == 0b011)
+    {
+        throw std::runtime_error("sample size code has reserved value (011)");
+    }
+    uint32_t frame_number{};
+    uint64_t sample_number{};
+
+    if (m_reader.read_bits(1))
+    {
+        throw std::runtime_error("2nd reserved bit in frame isn't 0");
+    }
+
+    switch (blocking_strategy)
+    {
+    case 0:
+        frame_number = static_cast<uint32_t>(decode_utf8(m_flac_stream));
+        break;
+    case 1:
+        sample_number = decode_utf8(m_flac_stream);
+        break;
+
+    default:
+        break;
+    }
+
+    // Print parsed values for debugging
+    std::cout << "Blocking Strategy: " << blocking_strategy << '\n';
+    std::cout << "Block Size: " << block_size_code << '\n';
+    std::cout << "Sample Rate: " << sample_rate_code << '\n';
+    // std::cout << "Channel Assignment: " << static_cast<int>(channel_assignment) << '\n';
+    std::cout << "Sample Size: " << sample_size_code << '\n';
+    if (blocking_strategy == 0)
+    {
+        std::cout << "Frame number: " << static_cast<int>(frame_number) << '\n';
+    }
+    else
+    {
+        std::cout << "Sample number: " << static_cast<int>(sample_number) << '\n';
     }
 }

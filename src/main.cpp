@@ -10,6 +10,7 @@ int main()
         flac_file.open_file();
         flac_file.check_flac_marker();
         flac_file.read_metadata();
+        flac_file.read_frame_header();
     }
     catch (const std::exception &e)
     {
