@@ -7,11 +7,14 @@
 #include <stdexcept>
 #include <string>
 
+#include "Bit_reader.hpp"
+
 class Flac
 {
 private:
     const std::string m_filename;
-    std::ifstream m_flac_stream{};
+    std::ifstream m_flac_stream;
+    Bit_reader m_reader;
     struct Stream_info
     {
         uint16_t min_block_size{};
@@ -27,10 +30,8 @@ private:
     Stream_info m_stream_info{};
 
 public:
-    explicit Flac(const std::string &m_filename) : m_filename(m_filename) {};
+    explicit Flac(const std::string &m_filename) : m_filename(m_filename), m_flac_stream(), m_reader() {};
     ~Flac();
-
-    void open_file();
 
     // Getter functions
     uint16_t get_min_block_size() const { return m_stream_info.min_block_size; }
@@ -43,8 +44,9 @@ public:
     uint64_t get_total_samples() const { return m_stream_info.total_samples; }
     const std::array<uint8_t, 16> &get_md5_signature() const { return m_stream_info.md5_signature; }
 
+    void open_file();
     void check_flac_marker();
-    void read_metadata_block_header();
+    void read_metadata();
     void read_metadata_block_STREAMINFO();
 };
 
@@ -63,21 +65,22 @@ void Flac::open_file()
     {
         throw std::runtime_error("Could not open file: " + m_filename);
     }
+    m_reader.setStream(m_flac_stream);
 }
 
 void Flac::check_flac_marker()
 {
     // The "fLaC" marker is expected in the first 4 bytes of the file.
-    constexpr std::array<char, 4> flac_marker = {'f', 'L', 'a', 'C'};
-    std::array<char, 4> marker{};
-    m_flac_stream.read(marker.data(), marker.size());
-    if (!m_flac_stream || !std::equal(marker.begin(), marker.end(), flac_marker.begin()))
+    constexpr std::string_view flac_marker = "fLaC";
+    std::string marker(4, '\0');
+    m_flac_stream.read(&marker[0], 4);
+    if (m_flac_stream.gcount() != 4 || marker != flac_marker)
     {
         throw std::runtime_error("File is not a valid FLAC file");
     }
 }
 
-void Flac::read_metadata_block_header()
+void Flac::read_metadata()
 {
     bool is_last_block = false;
     enum class block_type : u_int8_t
@@ -93,15 +96,9 @@ void Flac::read_metadata_block_header()
 
     while (!is_last_block)
     {
-        uint8_t block_header_info = m_flac_stream.get();
-        is_last_block = (block_header_info & 0x80) ? true : false; // first header bit == 1 -> last metadata block
-        block_type current_block_type = static_cast<block_type>(block_header_info & 0x7F);
-        uint32_t block_length = 0;
-
-        for (int i = 0; i < 3; ++i)
-        {
-            block_length = (block_length << 8) | m_flac_stream.get();
-        }
+        is_last_block = m_reader.read_bits(1);
+        block_type current_block_type = static_cast<block_type>(m_reader.read_bits(7));
+        uint32_t block_length = m_reader.read_bits(24);
 
         switch (current_block_type)
         {
@@ -137,7 +134,7 @@ void Flac::read_metadata_block_header()
             m_flac_stream.seekg(block_length, std::ios::cur);
             break;
         default:
-            std::cerr << "Unknown block type!" << std::endl;
+            throw std::runtime_error("Unknown block type");
             break;
         }
     }
@@ -145,40 +142,17 @@ void Flac::read_metadata_block_header()
 
 void Flac::read_metadata_block_STREAMINFO()
 {
-    constexpr uint32_t block_length = 34;
-    std::array<uint8_t, block_length> block{};
-    m_flac_stream.read(reinterpret_cast<char *>(block.data()), block_length);
+    m_stream_info.min_block_size = m_reader.read_bits(16);
+    m_stream_info.max_block_size = m_reader.read_bits(16);
+    m_stream_info.min_frame_size = m_reader.read_bits(24);
+    m_stream_info.max_frame_size = m_reader.read_bits(24);
+    m_stream_info.sample_rate = m_reader.read_bits(20);
+    m_stream_info.channels = m_reader.read_bits(3) + 1;
+    m_stream_info.bits_per_sample = m_reader.read_bits(5) + 1;
+    m_stream_info.total_samples = m_reader.read_bits(36);
 
-    // Minimum and maximum block size (16 bits each)
-    m_stream_info.min_block_size = (static_cast<uint8_t>(block[0]) << 8) | static_cast<uint8_t>(block[1]);
-    m_stream_info.max_block_size = (static_cast<uint8_t>(block[2]) << 8) | static_cast<uint8_t>(block[3]);
-
-    // Minimum and maximum frame size (24 bits each, might be zero if unknown)
-    m_stream_info.min_frame_size = (static_cast<uint8_t>(block[4]) << 16) |
-                                   (static_cast<uint8_t>(block[5]) << 8) |
-                                   static_cast<uint8_t>(block[6]);
-    m_stream_info.max_frame_size = (static_cast<uint8_t>(block[7]) << 16) |
-                                   (static_cast<uint8_t>(block[8]) << 8) |
-                                   static_cast<uint8_t>(block[9]);
-
-    // Sample rate (20 bits)
-    m_stream_info.sample_rate = (static_cast<uint8_t>(block[10]) << 12) |
-                                (static_cast<uint8_t>(block[11]) << 4) |
-                                ((static_cast<uint8_t>(block[12]) & 0xF0) >> 4);
-    // Channels (3 bits)
-    m_stream_info.channels = ((static_cast<uint8_t>(block[12]) & 0x0E) >> 1) + 1;
-
-    // Bits per sample (5 bits)
-    m_stream_info.bits_per_sample = ((static_cast<uint8_t>(block[12]) & 0x01) << 4) |
-                                    ((static_cast<uint8_t>(block[13]) & 0xF0) >> 4) + 1;
-
-    // Total samples (36 bits)
-    m_stream_info.total_samples = ((static_cast<uint64_t>(block[13] & 0x0F) << 32) |
-                                   (static_cast<uint8_t>(block[14]) << 24) |
-                                   (static_cast<uint8_t>(block[15]) << 16) |
-                                   (static_cast<uint8_t>(block[16]) << 8) |
-                                   static_cast<uint8_t>(block[17]));
-
-    // MD5 Signature (16 bytes)
-    std::copy(block.begin() + 18, block.begin() + 34, m_stream_info.md5_signature.begin());
+    for (size_t i = 0; i < 16; i++)
+    {
+        m_stream_info.md5_signature[i] = m_reader.read_bits(8);
+    }
 }
