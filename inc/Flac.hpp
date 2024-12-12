@@ -173,58 +173,163 @@ void Flac::read_frame_header()
 
     uint8_t blocking_strategy = m_reader.read_bits(1);
     uint8_t block_size_code = m_reader.read_bits(4);
-    if (block_size_code == 0b0000)
-    {
-        throw std::runtime_error("block size code has reserved value (0000)");
-    }
     uint8_t sample_rate_code = m_reader.read_bits(4);
-    if (sample_rate_code == 0b1111)
-    {
-        throw std::runtime_error("sample rate code has reserved value (1111)");
-    }
     uint8_t channel_assignment_code = m_reader.read_bits(4);
-    if (channel_assignment_code > 0b1010)
-    {
-        throw std::runtime_error("channel assignment code has reserved value (1011-1111)");
-    }
     uint8_t sample_size_code = m_reader.read_bits(3);
-    if (sample_size_code == 0b011)
-    {
-        throw std::runtime_error("sample size code has reserved value (011)");
-    }
-    uint32_t frame_number{};
-    uint64_t sample_number{};
+    uint64_t frame_or_sample_number{};
+
+    uint16_t block_size{};
+    uint32_t sample_rate{};
+    uint8_t sample_size{};
+    uint8_t crc_8{};
 
     if (m_reader.read_bits(1))
     {
         throw std::runtime_error("2nd reserved bit in frame isn't 0");
     }
 
-    switch (blocking_strategy)
+    frame_or_sample_number = decode_utf8(m_flac_stream);
+
+    switch (block_size_code)
     {
-    case 0:
-        frame_number = static_cast<uint32_t>(decode_utf8(m_flac_stream));
+    case 0b0000:
+        throw std::runtime_error("block size code has reserved value (0000)");
         break;
-    case 1:
-        sample_number = decode_utf8(m_flac_stream);
+    case 0b0001:
+        block_size = 192;
+        break;
+    case 0b0010:
+        block_size = 576;
+        break;
+    case 0b0011:
+        block_size = 1152;
+        break;
+    case 0b0100:
+        block_size = 2304;
+        break;
+    case 0b0101:
+        block_size = 4608;
+        break;
+    case 0b0110:
+        block_size = m_reader.read_bits(8) + 1;
+        break;
+    case 0b0111:
+        block_size = m_reader.read_bits(16) + 1;
+        break;
+    case 0b1000:
+        block_size = 256;
+        break;
+    case 0b1001:
+        block_size = 512;
+        break;
+    case 0b1010:
+        block_size = 1024;
+        break;
+    case 0b1011:
+        block_size = 2048;
+        break;
+    case 0b1100:
+        block_size = 4096;
+        break;
+    case 0b1101:
+        block_size = 8192;
+        break;
+    case 0b1110:
+        block_size = 16384;
+        break;
+    case 0b1111:
+        block_size = 32768;
         break;
 
     default:
         break;
     }
 
-    // Print parsed values for debugging
-    std::cout << "Blocking Strategy: " << blocking_strategy << '\n';
-    std::cout << "Block Size: " << block_size_code << '\n';
-    std::cout << "Sample Rate: " << sample_rate_code << '\n';
-    // std::cout << "Channel Assignment: " << static_cast<int>(channel_assignment) << '\n';
-    std::cout << "Sample Size: " << sample_size_code << '\n';
-    if (blocking_strategy == 0)
+    switch (sample_rate_code)
     {
-        std::cout << "Frame number: " << static_cast<int>(frame_number) << '\n';
+    case 0b0000:
+        sample_rate = m_stream_info.sample_rate;
+        break;
+    case 0b0001:
+        sample_rate = 88200;
+        break;
+    case 0b0010:
+        sample_rate = 176400;
+        break;
+    case 0b0011:
+        sample_rate = 192000;
+        break;
+    case 0b0100:
+        sample_rate = 8000;
+        break;
+    case 0b0101:
+        sample_rate = 16000;
+        break;
+    case 0b0110:
+        sample_rate = 22050;
+        break;
+    case 0b0111:
+        sample_rate = 24000;
+        break;
+    case 0b1000:
+        sample_rate = 32000;
+        break;
+    case 0b1001:
+        sample_rate = 44100;
+        break;
+    case 0b1010:
+        sample_rate = 48000;
+        break;
+    case 0b1011:
+        sample_rate = 96000;
+        break;
+    case 0b1100:
+        sample_rate = m_reader.read_bits(8) * 1000;
+        break;
+    case 0b1101:
+        sample_rate = m_reader.read_bits(16);
+        break;
+    case 0b1110:
+        sample_rate = m_reader.read_bits(16) * 10;
+        break;
+    case 0b1111:
+        throw std::runtime_error("Invalid sample rate code");
+        break;
+
+    default:
+        break;
     }
-    else
+
+    switch (sample_size_code)
     {
-        std::cout << "Sample number: " << static_cast<int>(sample_number) << '\n';
+    case 0b000:
+        sample_size = m_stream_info.bits_per_sample;
+        break;
+    case 0b001:
+        sample_size = 8;
+        break;
+    case 0b010:
+        sample_size = 12;
+        break;
+    case 0b011:
+        throw std::runtime_error("sample size code has reserved value");
+        break;
+    case 0b100:
+        sample_size = 16;
+        break;
+    case 0b101:
+        sample_size = 20;
+        break;
+    case 0b110:
+        sample_size = 24;
+        break;
+    case 0b111:
+        sample_size = 32;
+        break;
+
+    default:
+        break;
     }
+
+    crc_8 = m_reader.read_bits(8);
 }
