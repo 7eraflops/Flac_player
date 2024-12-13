@@ -1,6 +1,8 @@
-#include <cstdint>
+#pragma once
+
 #include <fstream>
-#include <stdexcept>
+
+#include "Bit_reader.hpp"
 
 // Function to decode a UTF-8 encoded number from a file stream (up to 5 bytes)
 uint64_t decode_utf8(std::ifstream &file_stream)
@@ -69,4 +71,22 @@ uint64_t decode_utf8(std::ifstream &file_stream)
     }
 
     return code_point;
+}
+
+// Function to decode numbers encoded in unary code
+uint8_t decode_unary(Bit_reader reader)
+{
+    uint8_t wasted_bits = 0;
+
+    while (true)
+    {
+        if (reader.read_bits(1) == 0)
+        {
+            wasted_bits++;
+        }
+        else
+        {
+            return ++wasted_bits;
+        }
+    }
 }
