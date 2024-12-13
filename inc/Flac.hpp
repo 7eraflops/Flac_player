@@ -1,34 +1,40 @@
 #pragma once
 
 #include <array>
-#include <cstdint>
-#include <fstream>
-#include <iostream>
-#include <stdexcept>
-#include <string>
-#include <unordered_map>
+#include <vector>
 
 #include "Bit_reader.hpp"
-#include "Utf8_decoder.hpp"
+#include "Decoders.hpp"
 
+struct Stream_info
+{
+    uint16_t min_block_size{};
+    uint16_t max_block_size{};
+    uint32_t min_frame_size{};
+    uint32_t max_frame_size{};
+    uint32_t sample_rate{};
+    uint8_t channels{};
+    uint8_t bits_per_sample{};
+    uint64_t total_samples{};
+    std::array<uint8_t, 16> md5_signature{};
+};
+Stream_info m_stream_info{};
+
+struct Frame_info
+{
+    uint8_t blocking_strategy{};
+    uint16_t block_size{};
+    uint32_t sample_rate{};
+    uint8_t channel_assignment{};
+    uint8_t sample_size{};
+    uint64_t frame_or_sample_number{};
+};
 class Flac
 {
 private:
     const std::string m_filename;
     std::ifstream m_flac_stream;
     Bit_reader m_reader;
-    struct Stream_info
-    {
-        uint16_t min_block_size{};
-        uint16_t max_block_size{};
-        uint32_t min_frame_size{};
-        uint32_t max_frame_size{};
-        uint32_t sample_rate{};
-        uint8_t channels{};
-        uint8_t bits_per_sample{};
-        uint64_t total_samples{};
-        std::array<uint8_t, 16> md5_signature{};
-    };
     Stream_info m_stream_info{};
 
 public:
@@ -50,7 +56,14 @@ public:
     void check_flac_marker();
     void read_metadata();
     void read_metadata_block_STREAMINFO();
-    void read_frame_header();
+    void read_frame();
+    void read_frame_header(Frame_info &frame_info);
+    void read_subframe_header(Frame_info &frame_info);
+    void decode_subframe_lpc(uint8_t order, Frame_info &frame_info);
+
+    uint16_t decode_block_size(uint8_t block_size_code);
+    uint32_t decode_sample_rate(uint8_t sample_rate_code);
+    uint8_t decode_sample_size(uint8_t sample_size_code);
 };
 
 Flac::~Flac()
@@ -68,7 +81,7 @@ void Flac::open_file()
     {
         throw std::runtime_error("Could not open file: " + m_filename);
     }
-    m_reader.setStream(m_flac_stream);
+    m_reader.set_stream(m_flac_stream);
 }
 
 void Flac::check_flac_marker()
@@ -86,7 +99,7 @@ void Flac::check_flac_marker()
 void Flac::read_metadata()
 {
     bool is_last_block = false;
-    enum class block_type : u_int8_t
+    enum class block_type : uint8_t
     {
         STREAMINFO = 0,
         PADDING = 1,
@@ -160,7 +173,14 @@ void Flac::read_metadata_block_STREAMINFO()
     }
 }
 
-void Flac::read_frame_header()
+void Flac::read_frame()
+{
+    Frame_info frame_info{};
+    read_frame_header(frame_info);
+    read_subframe_header(frame_info);
+}
+
+void Flac::read_frame_header(Frame_info &frame_info)
 {
     if (m_reader.read_bits(14) != 0b11111111111110)
     {
@@ -171,25 +191,102 @@ void Flac::read_frame_header()
         throw std::runtime_error("1st reserved bit in frame isn't 0");
     }
 
-    uint8_t blocking_strategy = m_reader.read_bits(1);
+    frame_info.blocking_strategy = m_reader.read_bits(1);
     uint8_t block_size_code = m_reader.read_bits(4);
     uint8_t sample_rate_code = m_reader.read_bits(4);
-    uint8_t channel_assignment_code = m_reader.read_bits(4);
+    frame_info.channel_assignment = m_reader.read_bits(4);
     uint8_t sample_size_code = m_reader.read_bits(3);
-    uint64_t frame_or_sample_number{};
-
-    uint16_t block_size{};
-    uint32_t sample_rate{};
-    uint8_t sample_size{};
-    uint8_t crc_8{};
 
     if (m_reader.read_bits(1))
     {
         throw std::runtime_error("2nd reserved bit in frame isn't 0");
     }
 
-    frame_or_sample_number = decode_utf8(m_flac_stream);
+    frame_info.frame_or_sample_number = decode_utf8(m_flac_stream);
+    frame_info.block_size = decode_block_size(block_size_code);
+    frame_info.sample_rate = decode_sample_rate(sample_rate_code);
+    frame_info.sample_size = decode_sample_size(sample_size_code);
+    uint8_t crc_8 = m_reader.read_bits(8);
+    // TODO: Implement CRC checking
+}
 
+void Flac::read_subframe_header(Frame_info &frame_info)
+{
+    if (m_reader.read_bits(1) != 0)
+    {
+        throw std::runtime_error("The first bit of the subframe is non-zero");
+    }
+
+    uint8_t subframe_type_code = m_reader.read_bits(6);
+    if ((subframe_type_code >= 2 && subframe_type_code <= 7) ||
+        (subframe_type_code >= 16 && subframe_type_code <= 31))
+    {
+        throw std::runtime_error("subframe type has reserved value");
+    }
+
+    uint8_t wasted_bits_per_sample{};
+    if (m_reader.read_bits(1))
+    {
+        wasted_bits_per_sample = decode_unary(m_reader);
+    }
+
+    uint8_t order{};
+
+    if (subframe_type_code == 0b000000)
+    {
+        // TODO: Implement handling for CONSTANT
+    }
+    else if (subframe_type_code == 0b000001)
+    {
+        // TODO: Implement handling for VERBATIM
+    }
+    else if ((subframe_type_code & 0b111000) == 0b001000)
+    {
+        order = subframe_type_code & 0b000111;
+        if (order > 4)
+        {
+            throw std::runtime_error("SUBFRAME_FIXED has invalid order");
+        }
+        // TODO: Implement handling for FIXED
+    }
+    else if ((subframe_type_code & 0b100000) == 0b100000)
+    {
+        order = (subframe_type_code & 0b011111) + 1;
+        decode_subframe_lpc(order, frame_info);
+    }
+    else
+    {
+        throw std::runtime_error("Unknown subframe type");
+    }
+}
+
+void Flac::decode_subframe_lpc(uint8_t order, Frame_info &frame_info)
+{
+    std::vector<int32_t> warm_up_samples(order);
+    for (uint8_t i = 0; i < order; i++)
+    {
+        warm_up_samples[i] = m_reader.read_bits_signed(frame_info.sample_size);
+    }
+
+    uint8_t qlp_bit_precision = m_reader.read_bits(4);
+    if (qlp_bit_precision == 0b1111)
+    {
+        throw std::runtime_error("Invalid QLP precission");
+    }
+    qlp_bit_precision++;
+
+    int8_t qlp_shift = m_reader.read_bits_signed(5);
+
+    std::vector<int16_t> predictor_coefficients(order);
+    for (uint8_t i = 0; i < order; i++)
+    {
+        predictor_coefficients[i] = m_reader.read_bits_signed(qlp_bit_precision) >> qlp_shift;
+    }
+}
+
+uint16_t Flac::decode_block_size(uint8_t block_size_code)
+{
+    uint16_t block_size{};
     switch (block_size_code)
     {
     case 0b0000:
@@ -244,7 +341,12 @@ void Flac::read_frame_header()
     default:
         break;
     }
+    return block_size;
+}
 
+uint32_t Flac::decode_sample_rate(uint8_t sample_rate_code)
+{
+    uint32_t sample_rate{};
     switch (sample_rate_code)
     {
     case 0b0000:
@@ -299,7 +401,12 @@ void Flac::read_frame_header()
     default:
         break;
     }
+    return sample_rate;
+}
 
+uint8_t Flac::decode_sample_size(uint8_t sample_size_code)
+{
+    uint8_t sample_size{};
     switch (sample_size_code)
     {
     case 0b000:
@@ -330,6 +437,5 @@ void Flac::read_frame_header()
     default:
         break;
     }
-
-    crc_8 = m_reader.read_bits(8);
+    return sample_size;
 }
