@@ -1,8 +1,6 @@
 #pragma once
 
-#include <cstdint>
 #include <fstream>
-#include <stdexcept>
 
 class Bit_reader
 {
@@ -15,7 +13,7 @@ public:
     explicit Bit_reader()
         : m_stream(nullptr) {}
 
-    void setStream(std::istream &stream)
+    void set_stream(std::istream &stream)
     {
         m_stream = &stream;
     }
@@ -47,5 +45,16 @@ public:
         m_bits_in_buffer -= num_bits;
 
         return result;
+    }
+
+    int64_t read_bits_signed(uint8_t num_bits)
+    {
+        uint64_t result = read_bits(num_bits);
+
+        if (result & (1ULL << (num_bits - 1)))
+        {
+            return static_cast<int64_t>(result) - (1ULL << num_bits);
+        }
+        return static_cast<int64_t>(result);
     }
 };
