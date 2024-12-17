@@ -111,3 +111,6 @@ dkms.conf
 
 # Build folder
 build
+
+# Decompressed .wav files
+*.wav
