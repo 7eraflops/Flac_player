@@ -11,8 +11,8 @@ private:
     uint8_t m_bits_in_buffer{};
 
 public:
-    explicit Bit_reader()
-        : m_stream(nullptr) {}
+    explicit Bit_reader(Input_stream &stream)
+        : m_stream(&stream), m_bit_buffer(0), m_bits_in_buffer(0) {}
 
     void set_stream(std::istream &stream)
     {
