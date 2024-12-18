@@ -12,7 +12,9 @@ namespace Flac_constants
         {4, -6, 4, -1},
     };
 
-    static constexpr uint16_t sync_code = 0b11111111111110;
+    static constexpr uint32_t flac_marker = 0x664c6143; // "fLaC"
+
+    static constexpr uint16_t frame_sync_code = 0b11111111111110;
 
     static constexpr uint16_t block_sizes[] = {
         0, 192, 576, 1152, 2304, 4608,
