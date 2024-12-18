@@ -2,6 +2,7 @@
 
 #include <fstream>
 
+template <typename Input_stream>
 class Bit_reader
 {
 private:
