@@ -1,6 +1,7 @@
 #pragma once
 
-#include <fstream>
+#include <cstdint>
+#include <stdexcept>
 
 template <typename Input_stream>
 class Bit_reader
@@ -19,25 +20,31 @@ public:
         m_stream = &stream;
     }
 
-    uint64_t read_bits(uint8_t num_bits)
+    uint8_t get_byte()
     {
-        if (m_stream == nullptr)
+        if (m_stream == nullptr || m_stream->eof())
         {
-            throw std::runtime_error("Stream not set in Bit_reader.");
+            throw std::runtime_error("End of stream reached.");
         }
 
-        if (num_bits > 64 || num_bits == 0)
+        char byte;
+        if (!m_stream->get(byte))
+        {
+            throw std::runtime_error("Failed to read byte from stream.");
+        }
+        return static_cast<uint8_t>(byte);
+    }
+
+    uint64_t read_bits_unsigned(uint8_t num_bits)
+    {
+        if (num_bits > 64)
         {
             throw std::invalid_argument("Number of bits to read must be between 1 and 64.");
         }
 
         while (m_bits_in_buffer < num_bits)
         {
-            uint8_t byte = 0;
-            if (!m_stream->read(reinterpret_cast<char *>(&byte), 1))
-            {
-                throw std::runtime_error("End of stream reached while reading bits.");
-            }
+            uint8_t byte = get_byte();
             m_bit_buffer = (m_bit_buffer << 8) | byte;
             m_bits_in_buffer += 8;
         }
