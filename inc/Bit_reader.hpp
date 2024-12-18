@@ -66,7 +66,7 @@ public:
 
     int64_t read_bits_signed(uint8_t num_bits)
     {
-        uint64_t result = read_bits(num_bits);
+        uint64_t result = read_bits_unsigned(num_bits);
 
         if (result & (1ULL << (num_bits - 1)))
         {
