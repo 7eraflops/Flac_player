@@ -7,7 +7,7 @@ template <typename Input_stream>
 class Bit_reader
 {
 private:
-    std::istream *m_stream{};
+    Input_stream *m_stream{};
     uint64_t m_bit_buffer{};
     uint8_t m_bits_in_buffer{};
 
@@ -73,5 +73,10 @@ public:
             return static_cast<int64_t>(result) - (1ULL << num_bits);
         }
         return static_cast<int64_t>(result);
+    }
+
+    void align_to_byte()
+    {
+        m_bits_in_buffer -= m_bits_in_buffer % 8;
     }
 };
