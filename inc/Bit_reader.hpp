@@ -42,6 +42,11 @@ public:
             throw std::invalid_argument("Number of bits to read must be between 1 and 64.");
         }
 
+        if (num_bits == 0)
+        {
+            return 0;
+        }
+
         while (m_bits_in_buffer < num_bits)
         {
             uint8_t byte = get_byte();
