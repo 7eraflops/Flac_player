@@ -15,9 +15,13 @@ public:
     explicit Bit_reader(Input_stream &stream)
         : m_stream(&stream), m_bit_buffer(0), m_bits_in_buffer(0) {}
 
-    void set_stream(std::istream &stream)
+    bool eos() const
     {
-        m_stream = &stream;
+        if (m_stream->peek() == EOF)
+        {
+            return true;
+        }
+        return false;
     }
 
     uint8_t get_byte()
