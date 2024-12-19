@@ -86,8 +86,6 @@ void Flac::read_metadata_block_STREAMINFO()
     m_stream_info.bits_per_sample = m_reader.read_bits_unsigned(5) + 1;
     m_stream_info.total_samples = m_reader.read_bits_unsigned(36);
 
-    m_audio_buffer.resize(m_stream_info.channels * m_stream_info.max_block_size);
-
     m_flac_stream.seekg(16, std::ios::cur); // skipping 16 bytes (md5 signature)
 }
 
@@ -284,7 +282,7 @@ void Flac::linear_prediction(uint8_t predictor_order, const int16_t *predictor_c
         int32_t prediction{};
         for (uint16_t j = 0; j < m_stream_info.channels * predictor_order; j += m_stream_info.channels)
         {
-            prediction += m_audio_buffer[i - 1 - j + m_channel_index] * predictor_coefficients[j / m_stream_info.channels];
+            prediction += m_audio_buffer[i - m_stream_info.channels - j + m_channel_index] * predictor_coefficients[j / m_stream_info.channels];
         }
         m_audio_buffer[i + m_channel_index] += (prediction >> qlp_shift);
     }
