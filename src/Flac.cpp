@@ -144,14 +144,14 @@ void Flac::decode_frame()
 
         if (m_frame_info.channel_assignment == 8)
         {
-            for (uint16_t i = 0; i < m_stream_info.channels * m_frame_info.block_size; i += m_stream_info.channels)
+            for (uint16_t i = 0; i < 2 * m_frame_info.block_size; i += 2)
             {
                 m_audio_buffer[i + 1] = m_audio_buffer[i] - m_audio_buffer[i + 1];
             }
         }
         else if (m_frame_info.channel_assignment == 9)
         {
-            for (uint16_t i = 0; i < m_stream_info.channels * m_frame_info.block_size; i += m_stream_info.channels)
+            for (uint16_t i = 0; i < 2 * m_frame_info.block_size; i += 2)
             {
                 m_audio_buffer[i] += m_audio_buffer[i + 1];
             }
@@ -159,7 +159,7 @@ void Flac::decode_frame()
         else if (m_frame_info.channel_assignment == 10)
         {
             int32_t mid{};
-            for (uint16_t i = 0; i < m_stream_info.channels * m_frame_info.block_size; i += m_stream_info.channels)
+            for (uint16_t i = 0; i < 2 * m_frame_info.block_size; i += 2)
             {
                 mid = (uint64_t)m_audio_buffer[i] << 1;
                 mid |= m_audio_buffer[i + 1] & 1;
