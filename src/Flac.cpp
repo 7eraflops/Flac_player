@@ -1,6 +1,4 @@
 #include "Flac.hpp"
-#include "decoders.hpp"
-#include "Flac_constants.hpp"
 
 Flac::~Flac()
 {
@@ -126,6 +124,8 @@ void Flac::decode_frame()
     m_frame_info.sample_rate = decode_sample_rate(sample_rate_code);
 
     m_frame_info.crc_8 = m_reader.read_bits_unsigned(8);
+
+    m_audio_buffer.resize(m_stream_info.channels * m_frame_info.block_size);
 
     if (m_frame_info.channel_assignment <= 0b0111)
     {
