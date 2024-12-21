@@ -166,6 +166,15 @@ void Flac::decode_frame()
             }
         }
     }
+
+// #define WAV
+#ifndef WAV
+    for (size_t i = 0; i < m_audio_buffer.size(); i++)
+    {
+        m_audio_buffer[i] = m_audio_buffer[i] << (32 - m_frame_info.bits_per_sample);
+    }
+#endif
+
     m_sample_count += m_frame_info.block_size;
     m_frame_count++;
     m_reader.align_to_byte();
@@ -264,7 +273,7 @@ void Flac::decode_subframe_lpc(uint8_t predictor_order, uint8_t bits_per_sample)
 
     int8_t qlp_shift = m_reader.read_bits_signed(5);
 
-    int16_t predictor_coefficients[32];
+    int16_t predictor_coefficients[32]{};
     for (uint8_t i = 0; i < predictor_order; i++)
     {
         predictor_coefficients[i] = m_reader.read_bits_signed(qlp_bit_precision);
