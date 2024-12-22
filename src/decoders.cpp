@@ -53,9 +53,9 @@ uint64_t decode_utf8(std::ifstream &file_stream)
     return code_point;
 }
 
-uint32_t decode_unary(Bit_reader<std::ifstream> &reader)
+uint64_t decode_unary(Bit_reader<std::ifstream> &reader)
 {
-    uint32_t result = 0;
+    uint64_t result = 0;
 
     while (reader.read_bits_unsigned(1) == 0)
     {
@@ -64,20 +64,20 @@ uint32_t decode_unary(Bit_reader<std::ifstream> &reader)
     return result;
 }
 
-int32_t decode_and_unfold_rice(uint8_t rice_parameter, Bit_reader<std::ifstream> &reader)
+int64_t decode_and_unfold_rice(uint8_t rice_parameter, Bit_reader<std::ifstream> &reader)
 {
-    uint32_t quotient = decode_unary(reader);
-    uint32_t remainder = reader.read_bits_unsigned(rice_parameter);
+    uint64_t quotient = decode_unary(reader);
+    uint64_t remainder = reader.read_bits_unsigned(rice_parameter);
 
-    uint32_t folded_rice = (quotient << rice_parameter) | remainder;
+    uint64_t folded_rice = (quotient << rice_parameter) | remainder;
     if (folded_rice % 2 == 0)
     {
-        int32_t unfolded_rice = static_cast<int32_t>(folded_rice >> 1);
+        int64_t unfolded_rice = static_cast<int64_t>(folded_rice >> 1);
         return unfolded_rice;
     }
     else
     {
-        int32_t unfolded_rice = static_cast<int32_t>(~(folded_rice >> 1));
+        int64_t unfolded_rice = static_cast<int64_t>(~(folded_rice >> 1));
         return unfolded_rice;
     }
 }

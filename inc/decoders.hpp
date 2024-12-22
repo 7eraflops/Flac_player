@@ -9,7 +9,7 @@
 uint64_t decode_utf8(std::ifstream &file_stream);
 
 // Function to decode numbers encoded in unary code
-uint32_t decode_unary(Bit_reader<std::ifstream> &reader);
+uint64_t decode_unary(Bit_reader<std::ifstream> &reader);
 
 // Function to decode and unfold Rice coded and zig-zag folded numbers
-int32_t decode_and_unfold_rice(uint8_t rice_parameter, Bit_reader<std::ifstream> &reader);
+int64_t decode_and_unfold_rice(uint8_t rice_parameter, Bit_reader<std::ifstream> &reader);

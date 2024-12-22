@@ -288,7 +288,7 @@ void Flac::linear_prediction(uint8_t predictor_order, const int16_t *predictor_c
 {
     for (uint16_t i = m_stream_info.channels * predictor_order; i < m_audio_buffer.size(); i += m_stream_info.channels)
     {
-        int32_t prediction{};
+        int64_t prediction{};
         for (uint16_t j = 0; j < m_stream_info.channels * predictor_order; j += m_stream_info.channels)
         {
             prediction += m_audio_buffer[i - m_stream_info.channels - j + m_channel_index] * predictor_coefficients[j / m_stream_info.channels];

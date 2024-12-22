@@ -2,6 +2,8 @@
 
 #include <cstdint>
 
+using buffer_sample_type = int64_t;
+
 struct Stream_info
 {
     uint16_t min_block_size{};

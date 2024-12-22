@@ -8,7 +8,6 @@
 #include "Flac_types.hpp"
 #include "decoders.hpp"
 
-using buffer_sample_type = int32_t;
 class Flac
 {
 private:
