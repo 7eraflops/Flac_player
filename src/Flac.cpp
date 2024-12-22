@@ -156,7 +156,7 @@ void Flac::decode_frame()
         }
         else if (m_frame_info.channel_assignment == 10)
         {
-            int32_t mid{};
+            int64_t mid{};
             for (uint16_t i = 0; i < 2 * m_frame_info.block_size; i += 2)
             {
                 mid = (uint64_t)m_audio_buffer[i] << 1;
@@ -167,7 +167,7 @@ void Flac::decode_frame()
         }
     }
 
-// #define WAV
+// #define WAV // comment this out, when using playback functionality
 #ifndef WAV
     for (size_t i = 0; i < m_audio_buffer.size(); i++)
     {
