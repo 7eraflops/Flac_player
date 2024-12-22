@@ -107,9 +107,9 @@ int main(int argc, char *argv[])
         while (!player.get_reader().eos())
         {
             player.decode_frame();
-            // std::vector<buffer_sample_type> buffer = player.get_audio_buffer();
+            std::vector<buffer_sample_type> buffer = player.get_audio_buffer();
 
-            snd_pcm_sframes_t frames = snd_pcm_writei(handle, player.get_playback_buffer(), player.get_playback_buffer_size() / channels);
+            snd_pcm_sframes_t frames = snd_pcm_writei(handle, buffer.data(), buffer.size() / channels);
 
             if (frames < 0)
             {
