@@ -26,13 +26,18 @@ add_executable(${EXECUTABLE_NAME} ${SRC_FILES})
 # Include directories (add your include directory)
 target_include_directories(${EXECUTABLE_NAME} PRIVATE inc)
 
-# Find the PulseAudio library
-find_package(PkgConfig REQUIRED)
-pkg_check_modules(PULSEAUDIO REQUIRED libpulse-simple)
+# Find ALSA package
+find_package(ALSA REQUIRED)
 
-# Link PulseAudio libraries
-target_link_libraries(${EXECUTABLE_NAME} PRIVATE ${PULSEAUDIO_LIBRARIES})
-target_include_directories(${EXECUTABLE_NAME} PRIVATE ${PULSEAUDIO_INCLUDE_DIRS})
+# Link PulseAudio and ALSA libraries
+target_link_libraries(${EXECUTABLE_NAME} PRIVATE 
+    ${ALSA_LIBRARIES}
+)
+
+# Add include directories for both PulseAudio and ALSA
+target_include_directories(${EXECUTABLE_NAME} PRIVATE 
+    ${ALSA_INCLUDE_DIRS}
+)
 
 # Optional: Add extra flags (if needed)
 set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -g")

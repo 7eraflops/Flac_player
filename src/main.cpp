@@ -1,13 +1,17 @@
 #include "Flac.hpp"
+#include <alsa/asoundlib.h>
 #include <iostream>
-#include <pulse/error.h>
-#include <pulse/simple.h>
 #include <stdio.h>
 
 int main(int argc, char *argv[])
 {
-    std::string filename = argv[1];
+    if (argc != 2)
+    {
+        std::cerr << "Usage: " << argv[0] << " <flac_file>\n";
+        return 1;
+    }
 
+    std::string filename = argv[1];
     std::ifstream flac_stream;
     try
     {
@@ -20,6 +24,10 @@ int main(int argc, char *argv[])
     }
 
     Flac player(flac_stream);
+    snd_pcm_t *handle;
+    snd_pcm_hw_params_t *params;
+    int error;
+
     try
     {
         player.initialize();
@@ -27,50 +35,102 @@ int main(int argc, char *argv[])
         int channels = player.get_stream_info().channels;
         int bit_depth = player.get_stream_info().bits_per_sample;
 
-        pa_sample_format_t format = PA_SAMPLE_S32NE;
-
-        pa_sample_spec ss;
-        ss.channels = channels;
-        ss.rate = sample_rate;
-        ss.format = format;
-
-        pa_buffer_attr buffer_attr;
-        buffer_attr.maxlength = (uint32_t)(-1);
-        buffer_attr.fragsize = pa_usec_to_bytes(500000, &ss);
-        buffer_attr.minreq = pa_usec_to_bytes(100000, &ss);
-        buffer_attr.prebuf = pa_usec_to_bytes(0, &ss);
-        buffer_attr.tlength = pa_usec_to_bytes(1000000, &ss);
-
-        pa_simple *s = NULL;
-        int error = 0;
-        s = pa_simple_new(NULL, "FLAC Player", PA_STREAM_PLAYBACK, NULL, "playback", &ss, NULL, &buffer_attr, &error);
-        if (!s)
+        // Open PCM device for playback
+        if ((error = snd_pcm_open(&handle, "default", SND_PCM_STREAM_PLAYBACK, 0)) < 0)
         {
-            fprintf(stderr, "pa_simple_new() failed: %s\n", pa_strerror(error));
+            std::cerr << "Cannot open audio device: " << snd_strerror(error) << "\n";
             return 1;
         }
 
+        // Allocate hardware parameters object
+        snd_pcm_hw_params_alloca(&params);
+
+        // Fill params with default values
+        if ((error = snd_pcm_hw_params_any(handle, params)) < 0)
+        {
+            std::cerr << "Cannot configure audio device: " << snd_strerror(error) << "\n";
+            snd_pcm_close(handle);
+            return 1;
+        }
+
+        // Set parameters
+        if ((error = snd_pcm_hw_params_set_access(handle, params, SND_PCM_ACCESS_RW_INTERLEAVED)) < 0)
+        {
+            std::cerr << "Cannot set access type: " << snd_strerror(error) << "\n";
+            snd_pcm_close(handle);
+            return 1;
+        }
+
+        // Set sample format
+        if ((error = snd_pcm_hw_params_set_format(handle, params, SND_PCM_FORMAT_S32_LE)) < 0)
+        {
+            std::cerr << "Cannot set sample format: " << snd_strerror(error) << "\n";
+            snd_pcm_close(handle);
+            return 1;
+        }
+
+        // Set channel count
+        if ((error = snd_pcm_hw_params_set_channels(handle, params, channels)) < 0)
+        {
+            std::cerr << "Cannot set channel count: " << snd_strerror(error) << "\n";
+            snd_pcm_close(handle);
+            return 1;
+        }
+
+        // Set sample rate
+        unsigned int actual_rate = sample_rate;
+        if ((error = snd_pcm_hw_params_set_rate_near(handle, params, &actual_rate, 0)) < 0)
+        {
+            std::cerr << "Cannot set sample rate: " << snd_strerror(error) << "\n";
+            snd_pcm_close(handle);
+            return 1;
+        }
+
+        // Set buffer size (similar to PulseAudio's tlength)
+        snd_pcm_uframes_t buffer_size = sample_rate; // 1 second buffer
+        if ((error = snd_pcm_hw_params_set_buffer_size_near(handle, params, &buffer_size)) < 0)
+        {
+            std::cerr << "Cannot set buffer size: " << snd_strerror(error) << "\n";
+            snd_pcm_close(handle);
+            return 1;
+        }
+
+        // Apply hardware parameters
+        if ((error = snd_pcm_hw_params(handle, params)) < 0)
+        {
+            std::cerr << "Cannot set parameters: " << snd_strerror(error) << "\n";
+            snd_pcm_close(handle);
+            return 1;
+        }
+
+        // Main playback loop
         while (!player.get_reader().eos())
         {
             player.decode_frame();
-            std::vector<buffer_sample_type> buffer = player.get_audio_buffer();
-            size_t buffer_size = buffer.size() * sizeof(buffer_sample_type);
+            // std::vector<buffer_sample_type> buffer = player.get_audio_buffer();
 
-            if (pa_simple_write(s, buffer.data(), buffer_size, &error) < 0)
+            snd_pcm_sframes_t frames = snd_pcm_writei(handle, player.get_playback_buffer(), player.get_playback_buffer_size() / channels);
+
+            if (frames < 0)
             {
-                fprintf(stderr, "pa_simple_write() failed: %s\n", pa_strerror(error));
-                pa_simple_free(s);
-                return 1;
+                frames = snd_pcm_recover(handle, frames, 0);
+                if (frames < 0)
+                {
+                    std::cerr << "Write failed: " << snd_strerror(frames) << "\n";
+                    break;
+                }
             }
         }
 
-        pa_simple_drain(s, &error);
-        pa_simple_free(s);
+        // Drain the buffer and close
+        snd_pcm_drain(handle);
+        snd_pcm_close(handle);
     }
     catch (const std::exception &e)
     {
         std::cerr << "Error: " << e.what() << '\n';
         return 1;
     }
+
     return 0;
 }
