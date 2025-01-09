@@ -53,7 +53,7 @@ uint64_t decode_utf8(std::ifstream &file_stream)
     return code_point;
 }
 
-uint64_t decode_unary(Bit_reader<std::ifstream> &reader)
+uint64_t decode_unary(mc::Bit_reader<std::ifstream> &reader)
 {
     uint64_t result = 0;
 
@@ -64,7 +64,7 @@ uint64_t decode_unary(Bit_reader<std::ifstream> &reader)
     return result;
 }
 
-int64_t decode_and_unfold_rice(uint8_t rice_parameter, Bit_reader<std::ifstream> &reader)
+int64_t decode_and_unfold_rice(uint8_t rice_parameter, mc::Bit_reader<std::ifstream> &reader)
 {
     uint64_t quotient = decode_unary(reader);
     uint64_t remainder = reader.read_bits_unsigned(rice_parameter);
