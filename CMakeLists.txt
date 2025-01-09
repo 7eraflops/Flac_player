@@ -2,7 +2,7 @@
 cmake_minimum_required(VERSION 3.10)
 
 # Project name and version
-project(audio_player_name_tbd VERSION 1.0.0)
+project(flac_player VERSION 1.0.0)
 
 # Set the C++ standard
 set(CMAKE_CXX_STANDARD 20)
@@ -15,7 +15,7 @@ if(NOT CMAKE_BUILD_TYPE)
 endif()
 
 # Define the executable name
-set(EXECUTABLE_NAME audio_player_name_tbd.out)
+set(EXECUTABLE_NAME flac_player)
 
 # Collect all the .cpp files in the src directory
 file(GLOB SRC_FILES src/*.cpp)
@@ -34,7 +34,7 @@ target_link_libraries(${EXECUTABLE_NAME} PRIVATE
     ${ALSA_LIBRARIES}
 )
 
-# Add include directories for both PulseAudio and ALSA
+# Add include directories for ALSA
 target_include_directories(${EXECUTABLE_NAME} PRIVATE 
     ${ALSA_INCLUDE_DIRS}
 )
