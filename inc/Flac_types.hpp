@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cstdint>
+#include <unordered_map>
 
 using buffer_sample_type = int64_t;
 
@@ -26,6 +27,12 @@ struct Frame_info
     uint64_t frame_or_sample_number{};
     uint8_t crc_8{};
     uint16_t crc_16{};
+};
+
+struct Vorbis_comment
+{
+    std::string vendor_string;
+    std::unordered_map<std::string, std::string> user_comments;
 };
 
 enum class block_type : uint8_t

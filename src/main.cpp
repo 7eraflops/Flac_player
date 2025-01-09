@@ -3,6 +3,19 @@
 #include <iostream>
 #include <stdio.h>
 
+std::vector<int32_t> convert_to_32bit(const std::vector<int64_t> &buffer)
+{
+    std::vector<int32_t> converted_buffer;
+    converted_buffer.reserve(buffer.size());
+
+    for (const auto &sample : buffer)
+    {
+        converted_buffer.push_back(static_cast<int32_t>(sample));
+    }
+
+    return converted_buffer;
+}
+
 int main(int argc, char *argv[])
 {
     if (argc != 2)
@@ -34,6 +47,17 @@ int main(int argc, char *argv[])
         int sample_rate = player.get_stream_info().sample_rate;
         int channels = player.get_stream_info().channels;
         int bit_depth = player.get_stream_info().bits_per_sample;
+
+        const auto &comments = player.get_vorbis_comment().user_comments;
+        auto it = comments.find("TITLE");
+        if (it != comments.end())
+        {
+            std::cout << "Track Title: " << it->second << "\n";
+        }
+        else
+        {
+            std::cout << "Track Title not found.\n";
+        }
 
         // Open PCM device for playback
         if ((error = snd_pcm_open(&handle, "default", SND_PCM_STREAM_PLAYBACK, 0)) < 0)
@@ -107,7 +131,7 @@ int main(int argc, char *argv[])
         while (!player.get_reader().eos())
         {
             player.decode_frame();
-            std::vector<buffer_sample_type> buffer = player.get_audio_buffer();
+            std::vector<int32_t> buffer = convert_to_32bit(player.get_audio_buffer());
 
             snd_pcm_sframes_t frames = snd_pcm_writei(handle, buffer.data(), buffer.size() / channels);
 

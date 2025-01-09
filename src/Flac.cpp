@@ -45,7 +45,6 @@ void Flac::read_metadata()
             read_metadata_block_STREAMINFO();
             break;
         case block_type::PADDING:
-            // TODO: implement function for PADDING block
             m_flac_stream.seekg(block_length, std::ios::cur);
             break;
         case block_type::APPLICATION:
@@ -57,8 +56,7 @@ void Flac::read_metadata()
             m_flac_stream.seekg(block_length, std::ios::cur);
             break;
         case block_type::VORBIS_COMMENT:
-            // TODO: implement function for VORBIS_COMMENT block
-            m_flac_stream.seekg(block_length, std::ios::cur);
+            read_metadata_block_VORBIS_COMMENT();
             break;
         case block_type::CUESHEET:
             // TODO: implement function for CUESHEET block
@@ -87,6 +85,38 @@ void Flac::read_metadata_block_STREAMINFO()
     m_stream_info.total_samples = m_reader.read_bits_unsigned(36);
 
     m_flac_stream.seekg(16, std::ios::cur); // skipping 16 bytes (md5 signature)
+}
+
+void Flac::read_metadata_block_VORBIS_COMMENT()
+{
+    uint32_t vendor_length;
+    m_flac_stream.read(reinterpret_cast<char *>(&vendor_length), 4);
+
+    std::vector<char> vendor_data(vendor_length);
+    m_flac_stream.read(vendor_data.data(), vendor_length);
+    m_vorbis_comment.vendor_string = std::string(vendor_data.begin(), vendor_data.end());
+
+    uint32_t user_comment_count;
+    m_flac_stream.read(reinterpret_cast<char *>(&user_comment_count), 4);
+
+    m_vorbis_comment.user_comments.clear();
+    for (uint32_t i = 0; i < user_comment_count; i++)
+    {
+        uint32_t comment_length;
+        m_flac_stream.read(reinterpret_cast<char *>(&comment_length), 4);
+
+        std::vector<char> comment_data(comment_length);
+        m_flac_stream.read(comment_data.data(), comment_length);
+        std::string comment(comment_data.begin(), comment_data.end());
+
+        size_t delimiter_pos = comment.find('=');
+        if (delimiter_pos != std::string::npos)
+        {
+            std::string key = comment.substr(0, delimiter_pos);
+            std::string value = comment.substr(delimiter_pos + 1);
+            m_vorbis_comment.user_comments[key] = value;
+        }
+    }
 }
 
 void Flac::decode_frame()

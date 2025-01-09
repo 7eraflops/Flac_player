@@ -1,6 +1,7 @@
 #pragma once
 
 #include <fstream>
+#include <unordered_map>
 #include <vector>
 
 #include "Bit_reader.hpp"
@@ -16,6 +17,7 @@ private:
     uint64_t m_frame_count{};
     Stream_info m_stream_info{};
     Frame_info m_frame_info{};
+    Vorbis_comment m_vorbis_comment;
     std::ifstream &m_flac_stream;
     Bit_reader<std::ifstream> m_reader;
     std::vector<buffer_sample_type> m_audio_buffer;
@@ -48,6 +50,7 @@ public:
     // Getter functions
     const Stream_info &get_stream_info() { return m_stream_info; }
     const Frame_info &get_frame_info() { return m_frame_info; }
+    const Vorbis_comment &get_vorbis_comment() { return m_vorbis_comment; }
     const Bit_reader<std::ifstream> &get_reader() const { return m_reader; }
     const std::vector<buffer_sample_type> &get_audio_buffer() const { return m_audio_buffer; }
 
