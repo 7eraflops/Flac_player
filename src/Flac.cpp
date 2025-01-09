@@ -1,6 +1,6 @@
 #include "Flac.hpp"
 
-Flac::~Flac()
+mc::Flac::~Flac()
 {
     if (m_flac_stream.is_open())
     {
@@ -8,7 +8,7 @@ Flac::~Flac()
     }
 }
 
-void Flac::initialize()
+void mc::Flac::initialize()
 {
     if (m_flac_stream.is_open() && m_flac_stream.good())
     {
@@ -17,7 +17,7 @@ void Flac::initialize()
     }
 }
 
-void Flac::check_flac_marker()
+void mc::Flac::check_flac_marker()
 {
     if (m_reader.read_bits_unsigned(32) != Flac_constants::flac_marker)
     {
@@ -25,7 +25,7 @@ void Flac::check_flac_marker()
     }
 }
 
-void Flac::read_metadata()
+void mc::Flac::read_metadata()
 {
     bool is_last_block = false;
 
@@ -73,7 +73,7 @@ void Flac::read_metadata()
     }
 }
 
-void Flac::read_metadata_block_STREAMINFO()
+void mc::Flac::read_metadata_block_STREAMINFO()
 {
     m_stream_info.min_block_size = m_reader.read_bits_unsigned(16);
     m_stream_info.max_block_size = m_reader.read_bits_unsigned(16);
@@ -87,7 +87,7 @@ void Flac::read_metadata_block_STREAMINFO()
     m_flac_stream.seekg(16, std::ios::cur); // skipping 16 bytes (md5 signature)
 }
 
-void Flac::read_metadata_block_VORBIS_COMMENT()
+void mc::Flac::read_metadata_block_VORBIS_COMMENT()
 {
     uint32_t vendor_length;
     m_flac_stream.read(reinterpret_cast<char *>(&vendor_length), 4);
@@ -119,7 +119,7 @@ void Flac::read_metadata_block_VORBIS_COMMENT()
     }
 }
 
-void Flac::decode_frame()
+void mc::Flac::decode_frame()
 {
     if (m_reader.eos())
     {
@@ -197,13 +197,10 @@ void Flac::decode_frame()
         }
     }
 
-// #define WAV // comment this out, when using playback functionality
-#ifndef WAV
     for (size_t i = 0; i < m_audio_buffer.size(); i++)
     {
         m_audio_buffer[i] = m_audio_buffer[i] << (32 - m_frame_info.bits_per_sample);
     }
-#endif
 
     m_sample_count += m_frame_info.block_size;
     m_frame_count++;
@@ -211,7 +208,7 @@ void Flac::decode_frame()
     m_frame_info.crc_16 = m_reader.read_bits_unsigned(16);
 }
 
-void Flac::decode_subframe(uint8_t bits_per_sample)
+void mc::Flac::decode_subframe(uint8_t bits_per_sample)
 {
     if (m_reader.read_bits_unsigned(1) != 0)
     {
@@ -276,7 +273,7 @@ void Flac::decode_subframe(uint8_t bits_per_sample)
     }
 }
 
-void Flac::decode_subframe_fixed(uint8_t predictor_order, uint8_t bits_per_sample)
+void mc::Flac::decode_subframe_fixed(uint8_t predictor_order, uint8_t bits_per_sample)
 {
     for (uint8_t i = 0; i < m_stream_info.channels * predictor_order; i += m_stream_info.channels)
     {
@@ -287,7 +284,7 @@ void Flac::decode_subframe_fixed(uint8_t predictor_order, uint8_t bits_per_sampl
     linear_prediction(predictor_order, Flac_constants::fixed_prediction_coefficients[predictor_order], 0);
 }
 
-void Flac::decode_subframe_lpc(uint8_t predictor_order, uint8_t bits_per_sample)
+void mc::Flac::decode_subframe_lpc(uint8_t predictor_order, uint8_t bits_per_sample)
 {
     for (uint8_t i = 0; i < m_stream_info.channels * predictor_order; i += m_stream_info.channels)
     {
@@ -314,7 +311,7 @@ void Flac::decode_subframe_lpc(uint8_t predictor_order, uint8_t bits_per_sample)
     linear_prediction(predictor_order, predictor_coefficients, qlp_shift);
 }
 
-void Flac::linear_prediction(uint8_t predictor_order, const int16_t *predictor_coefficients, int8_t qlp_shift)
+void mc::Flac::linear_prediction(uint8_t predictor_order, const int16_t *predictor_coefficients, int8_t qlp_shift)
 {
     for (uint16_t i = m_stream_info.channels * predictor_order; i < m_audio_buffer.size(); i += m_stream_info.channels)
     {
@@ -327,7 +324,7 @@ void Flac::linear_prediction(uint8_t predictor_order, const int16_t *predictor_c
     }
 }
 
-void Flac::decode_residuals(uint8_t predictor_order)
+void mc::Flac::decode_residuals(uint8_t predictor_order)
 {
     uint8_t residual_coding_method = m_reader.read_bits_unsigned(2);
     if (residual_coding_method == 0b10 || residual_coding_method == 0b11)
@@ -365,7 +362,7 @@ void Flac::decode_residuals(uint8_t predictor_order)
     }
 }
 
-uint16_t Flac::decode_block_size(uint8_t block_size_code)
+uint16_t mc::Flac::decode_block_size(uint8_t block_size_code)
 {
     switch (block_size_code)
     {
@@ -385,7 +382,7 @@ uint16_t Flac::decode_block_size(uint8_t block_size_code)
     return Flac_constants::block_sizes[block_size_code];
 }
 
-uint32_t Flac::decode_sample_rate(uint8_t sample_rate_code)
+uint32_t mc::Flac::decode_sample_rate(uint8_t sample_rate_code)
 {
     switch (sample_rate_code)
     {
@@ -411,7 +408,7 @@ uint32_t Flac::decode_sample_rate(uint8_t sample_rate_code)
     return Flac_constants::sample_rates[sample_rate_code];
 }
 
-uint8_t Flac::decode_sample_size(uint8_t sample_size_code)
+uint8_t mc::Flac::decode_sample_size(uint8_t sample_size_code)
 {
     switch (sample_size_code)
     {
