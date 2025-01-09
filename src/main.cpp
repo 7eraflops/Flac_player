@@ -36,7 +36,7 @@ int main(int argc, char *argv[])
         return 1;
     }
 
-    Flac player(flac_stream);
+    mc::Flac player(flac_stream);
     snd_pcm_t *handle;
     snd_pcm_hw_params_t *params;
     int error;
@@ -49,7 +49,17 @@ int main(int argc, char *argv[])
         int bit_depth = player.get_stream_info().bits_per_sample;
 
         const auto &comments = player.get_vorbis_comment().user_comments;
-        auto it = comments.find("TITLE");
+        std::cout << "Now Playing: " << "\n";
+        auto it = comments.find("ARTIST");
+        if (it != comments.end())
+        {
+            std::cout << "Artist: " << it->second << "\n";
+        }
+        else
+        {
+            std::cout << "Artist not found.\n";
+        }
+        it = comments.find("TITLE");
         if (it != comments.end())
         {
             std::cout << "Track Title: " << it->second << "\n";
@@ -57,6 +67,15 @@ int main(int argc, char *argv[])
         else
         {
             std::cout << "Track Title not found.\n";
+        }
+        it = comments.find("ALBUM");
+        if (it != comments.end())
+        {
+            std::cout << "Ablum: " << it->second << "\n";
+        }
+        else
+        {
+            std::cout << "Album not found.\n";
         }
 
         // Open PCM device for playback
@@ -110,7 +129,7 @@ int main(int argc, char *argv[])
             return 1;
         }
 
-        // Set buffer size (similar to PulseAudio's tlength)
+        // Set buffer size
         snd_pcm_uframes_t buffer_size = sample_rate; // 1 second buffer
         if ((error = snd_pcm_hw_params_set_buffer_size_near(handle, params, &buffer_size)) < 0)
         {
