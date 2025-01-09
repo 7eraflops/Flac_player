@@ -1,3 +1,3 @@
 # Flac_player
 
-An audio player with integrated audio effects, capable of playing MP3 and FLAC. Written in C/C++
+A simple terminal audio player, capable of decoding and playing flac files written in c++
